@@ -7,6 +7,8 @@ HLT = 0b00000001
 LDI = 0b10000010
 PRN = 0b01000111
 MUL = 0b10100010 
+PUSH = 0b01000101
+POP = 0b01000110
 
 class CPU:
     """Main CPU class."""
@@ -16,6 +18,7 @@ class CPU:
         self.ram = [0] * 256
         self.reg = [0] * 8
         self.pc = 0
+        self.SP = 7
         self.running = False
         # branch table
         self.branchtable = {}
@@ -23,6 +26,8 @@ class CPU:
         self.branchtable[LDI] = self.handle_ldi
         self.branchtable[PRN] = self.handle_pri
         self.branchtable[MUL] = self.handle_mul
+        self.branchtable[PUSH] = self.handle_push
+        self.branchtable[POP] = self.handle_pop
 
     def load(self):
         """Load a program into memory."""
@@ -114,8 +119,33 @@ class CPU:
     def handle_mul(self, reg_a, reg_b):
         self.alu("MUL", reg_a, reg_b)
 
+    # PUSH INSTRUCTION: Push the value in the given register on the stack
+    def handle_push(self, operand_a, operand_b):
+        # decrement SP
+        self.reg[self.SP] -= 1
+
+        # get value to push...operand_a is reg num to push 
+        value = self.reg[operand_a]
+
+        # copy value to SP address
+        self.ram[self.reg[self.SP]] = value
+    
+    # POP INSTRUCTION: Pop the value at the top of the stack into the given register
+    def handle_pop(self, operand_a, operand_b): 
+        # get value at top of stack address
+        value = self.ram[self.reg[self.SP]]
+
+        # store value in the register (reg num to pop into is operand_a)
+        self.reg[operand_a] = value
+
+        # increment SP
+        self.reg[self.SP] += 1
+
     def run(self):
         """Run the CPU."""
+        # initialize stack pointer
+        self.reg[self.SP] = 0xF4
+
         # set running to True
         self.running = True
 
@@ -131,7 +161,7 @@ class CPU:
             op_a = self.ram_read(self.pc+1)
             op_b = self.ram_read(self.pc+2)
 
-            # use branchtable to perform proper program
+            # use branchtable to complete corresponding instruction
             self.branchtable[ir](op_a, op_b)
 
             # increment pc

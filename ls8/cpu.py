@@ -12,6 +12,18 @@ PUSH = 0b01000101
 POP = 0b01000110
 CALL = 0b01010000
 RET = 0b00010001
+CMP = 0b10100111
+JMP = 0b01010100
+JEQ = 0b01010101
+JNE = 0b01010110
+# bitwise
+AND = 0b10101000
+OR = 0b10101010
+XOR = 0b10101011
+NOT = 0b01101001
+SHL = 0b10101100
+SHR = 0b10101101
+MOD = 0b10100100
 
 class CPU:
     """Main CPU class."""
@@ -22,6 +34,7 @@ class CPU:
         self.reg = [0] * 8
         self.pc = 0
         self.SP = 7
+        self.FL = 0b00000000
         self.running = False
         # branch table
         self.branchtable = {}
@@ -34,6 +47,18 @@ class CPU:
         self.branchtable[POP] = self.handle_POP
         self.branchtable[CALL] = self.handle_CALL
         self.branchtable[RET] = self.handle_RET
+        self.branchtable[CMP] = self.handle_CMP
+        self.branchtable[JMP] = self.handle_JMP
+        self.branchtable[JEQ] = self.handle_JEQ
+        self.branchtable[JNE] = self.handle_JNE
+        # bitwise
+        self.branchtable[AND] = self.handle_AND
+        self.branchtable[OR] = self.handle_OR
+        self.branchtable[XOR] = self.handle_XOR
+        self.branchtable[NOT] = self.handle_NOT
+        self.branchtable[SHL] = self.handle_SHL
+        self.branchtable[SHR] = self.handle_SHR
+        self.branchtable[MOD] = self.handle_MOD
 
     def load(self):
         """Load a program into memory."""
@@ -71,12 +96,37 @@ class CPU:
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
-
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
         #elif op == "SUB": etc
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "CMP": 
+            # if a < b, set L flag to 1; otherwise set to 0
+            if self.reg[reg_a] < self.reg[reg_b]: 
+                self.FL = 0b00000100
+            # if a > b, set G flag to 1; otherwise set to 0
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.FL = 0b00000010
+            # if a = b, set E flag to 1; otherwise set to 0
+            elif self.reg[reg_a] == self.reg[reg_b]:
+                self.FL = 0b00000001
+        # ~~~ BITWISE START ~~~ #
+        elif op == "AND":
+            self.reg[reg_a] = self.reg[reg_a] & self.reg[reg_b]
+        elif op == "OR":
+            self.reg[reg_a] = self.reg[reg_a] | self.reg[reg_b]
+        elif op == "XOR":
+            self.reg[reg_a] = self.reg[reg_a] ^ self.reg[reg_b]
+        elif op == "NOT":
+            self.reg[reg_a] = ~self.reg[reg_a]
+        elif op == "SHL":
+            self.reg[reg_a] = self.reg[reg_a] << self.reg[reg_b]
+        elif op == "SHR":
+            self.reg[reg_a] = self.reg[reg_a] >> self.reg[reg_b]
+        elif op == "MOD":
+            self.reg[reg_a] = self.reg[reg_a] % self.reg[reg_b]
+        # ~~~ BITWISE END ~~~ #
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -123,41 +173,67 @@ class CPU:
     # HLT INSTRUCTION: Halt CPU & exit emulator
     def handle_HLT(self, a, b):
         self.running = False
-        print("ALL DONE!!!")
 
     # LDI INSTRUCTION: Set value of register to an integer
-    def handle_LDI(self, operand_a, operand_b): 
-        self.reg[operand_a] = operand_b
+    def handle_LDI(self, op_a, op_b): 
+        self.reg[op_a] = op_b
 
     # PRN INSTRUCTION: print numeric value stored in given register
-    def handle_PRN(self, operand_a, operand_b):
-        print(f"Value at register {operand_a}: {self.reg[operand_a]}")
+    def handle_PRN(self, op_a, b):
+        print(f"{self.reg[op_a]}")
 
+    # ~~~ ALU OPS START ~~~ #
     # MUL INSTRUCITON: Multiply values in 2 registers together & store result in registerA
-    def handle_MUL(self, reg_a, reg_b):
-        self.alu("MUL", reg_a, reg_b)
+    def handle_MUL(self, op_a, op_b):
+        self.alu("MUL", op_a, op_b)
     
-    def handle_ADD(self, reg_a, reg_b):
-        self.alu("ADD", reg_a, reg_b)
+    def handle_ADD(self, op_a, op_b):
+        self.alu("ADD", op_a, op_b)
+
+    # CMP INSTRUCTION: Compare values in 2 registers & set flag value accordingly...handled by ALU
+    def handle_CMP(self, op_a, op_b): 
+        self.alu("CMP", op_a, op_b)
+
+    def handle_AND(self, op_a, op_b):
+        self.alu("AND", op_a, op_b)
+
+    def handle_OR(self, op_a, op_b):
+        self.alu("OR", op_a, op_b)
+
+    def handle_XOR(self, op_a, op_b):
+        self.alu("XOR", op_a, op_b)
+    
+    def handle_NOT(self, op_a, op_b):
+        self.alu("NOT", op_a, op_b)
+    
+    def handle_SHL(self, op_a, op_b):
+        self.alu("SHL", op_a, op_b)
+
+    def handle_SHR(self, op_a, op_b):
+        self.alu("SHR", op_a, op_b)
+
+    def handle_MOD(self, op_a, op_b):
+        self.alu("MOD", op_a, op_b)
+    # ~~~ ALU OPS END ~~~ #
 
     # PUSH INSTRUCTION: Push the value in the given register on the stack
-    def handle_PUSH(self, operand_a, operand_b):
+    def handle_PUSH(self, op_a, b):
         # get value to push...operand_a is reg num to push 
-        value = self.reg[operand_a]
+        value = self.reg[op_a]
 
         # call push helper function (decrements SP & copies value to SP addr)
         self.push_value(value)
     
     # POP INSTRUCTION: Pop the value at the top of the stack into the given register
-    def handle_POP(self, operand_a, operand_b): 
+    def handle_POP(self, op_a, b): 
         # get value at top of stack address w/ pop helper function (this also increments SP)
         value = self.pop_value()
 
         # store value in the register (reg num to pop into is operand_a)
-        self.reg[operand_a] = value
+        self.reg[op_a] = value
 
     # CALL INSTRUCTION: Calls a subroutine at the address stored in the register
-    def handle_CALL(self, op_a, b):
+    def handle_CALL(self, a, b):
         # compute the return address...call has 1 operand (pc+1), so this will be pc+2
         return_addr = self.pc + 2 
         # push return addr on stack
@@ -173,6 +249,26 @@ class CPU:
         value = self.pop_value()
         # # set pc to that value (return addr)
         self.pc = value
+
+    # ~~~ JUMPS ~~~ #
+    # JMP INSTRUCTION: Jump to the address stored in the given register; set PC to addr stored in given reg
+    def handle_JMP(self, op_a, b): 
+        self.pc = self.reg[op_a]
+
+    # JEQ INSTRUCTION: if equal flag is set (True, 1), jump to address stored in given reg...otherwise go to next? 
+    def handle_JEQ(self, op_a, b): 
+        if self.FL == 0b00000001: 
+            self.pc = self.reg[op_a]
+        else: 
+            self.pc += 2
+    
+    # JNE INSTRUCTION: If E flag is clear (false, 0), jump to the address stored in the given register
+    def handle_JNE(self, op_a, b):
+        if self.FL != 0b00000001: 
+            self.pc = self.reg[op_a]
+        else: 
+            self.pc += 2
+    # ~~~ JUMPS END ~~~ #
 
     def run(self):
         """Run the CPU."""
